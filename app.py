@@ -15,7 +15,7 @@ st.write("Upload an image, and the AI model will predict if it's Real or AI-gene
 # =====================================================================
 @st.cache_resource
 def load_detector_model():
-    model_name = "umm-maybe/AI-image-detector"
+    model_name = "Smogy/SMOGY-Ai-images-detector"
     processor = AutoImageProcessor.from_pretrained(model_name)
     model = AutoModelForImageClassification.from_pretrained(model_name)
     return processor, model
@@ -38,7 +38,7 @@ if uploaded_file is not None:
     # Preprocess the image for the model
     inputs = processor(images=image, return_tensors="pt")
 
-    # =====================================================================
+# =====================================================================
 # SECTION 4: MAKING THE PREDICTION & DISPLAYING RESULTS
 # =====================================================================
     with torch.no_grad():
@@ -48,15 +48,27 @@ if uploaded_file is not None:
     # Convert raw outputs (logits) into percentage probabilities
     probabilities = torch.nn.functional.softmax(logits, dim=-1)[0]
     
+    # Dynamically extract and match labels to their exact scores
+    ai_prob = 0.0
+    real_prob = 0.0
+
+    for idx, prob in enumerate(probabilities):
+        label_text = model.config.id2label[idx].lower()
+        percentage = prob.item() * 100
+        
+        # Check for any variation of AI or Real label keywords
+        if any(kw in label_text for kw in ["ai", "fake", "synthetic", "artificial"]):
+            ai_prob = percentage
+        elif any(kw in label_text for kw in ["real", "human"]):
+            real_prob = percentage
+
     # Create two layout columns on the screen
     col1, col2 = st.columns(2)
     
     with col1:
-        real_prob = probabilities[0].item() * 100
         st.metric(label="Probability it is REAL", value=f"{real_prob:.2f}%")
         
     with col2:
-        ai_prob = probabilities[1].item() * 100
         st.metric(label="Probability it is AI-Generated", value=f"{ai_prob:.2f}%")
         
     # Final Verdict Banner
@@ -64,4 +76,3 @@ if uploaded_file is not None:
         st.error(f"🚨 Verdict: This image looks AI-generated ({ai_prob:.1f}% confidence).")
     else:
         st.success(f"✅ Verdict: This image looks Human-made/Real ({real_prob:.1f}% confidence).")
-        
